@@ -1,0 +1,52 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: bookstore-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: demo000
+      MYSQL_DATABASE: bookstore
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: bookstore-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+
+  app:
+    build: ./backend
+    container_name: bookstore-app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "mysql+aiomysql://root:demo000@mysql:3306/bookstore"
+      REDIS_URL: "redis://redis:6379/0"
+      JWT_SECRET: "docker-dev-secret-key-change-in-production"
+      JWT_ALGORITHM: "HS256"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      CORS_ORIGINS: "http://localhost:5173"
+      DB_ECHO: "false"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  mysql_data:

@@ -1,0 +1,209 @@
+# ============================================================
+# 在线书店 API 测试用例
+# 在 VS Code 中安装 REST Client 插件后可一键发送每个请求
+# 每个 ### 分隔一个独立的请求
+# ============================================================
+
+# ====== 根路径 ======
+
+### 根路径
+GET http://127.0.0.1:8000/
+
+###
+
+# ====== 书籍 ======
+
+### 书籍列表（默认分页）
+GET http://127.0.0.1:8000/api/v1/books?page=1&page_size=4
+
+###
+
+### 书籍搜索（关键字）
+GET http://127.0.0.1:8000/api/v1/books?keyword=Python&page=1&page_size=4
+
+###
+
+### 书籍搜索（作者名）
+GET http://127.0.0.1:8000/api/v1/books?keyword=张三&page=1&page_size=4
+
+###
+
+### 书籍筛选（按分类）
+GET http://127.0.0.1:8000/api/v1/books?category_id=2&page=1&page_size=4
+
+###
+
+### 书籍筛选（价格范围）
+GET http://127.0.0.1:8000/api/v1/books?min_price=50&max_price=100&page=1&page_size=4
+
+###
+
+### 书籍排序（价格从低到高）
+GET http://127.0.0.1:8000/api/v1/books?sort=price_asc&page=1&page_size=4
+
+###
+
+### 书籍排序（价格从高到低）
+GET http://127.0.0.1:8000/api/v1/books?sort=price_desc&page=1&page_size=4
+
+###
+
+### 书籍详情
+GET http://127.0.0.1:8000/api/v1/books/1
+
+###
+
+### 不存在的书籍（应返回 404）
+GET http://127.0.0.1:8000/api/v1/books/99999
+
+###
+
+# ====== 出版社 & 分类 ======
+
+### 出版社列表
+GET http://127.0.0.1:8000/api/v1/publishers
+
+###
+
+### 分类树
+GET http://127.0.0.1:8000/api/v1/categories
+
+###
+
+# ====== 书评 ======
+
+### 某书的书评列表
+GET http://127.0.0.1:8000/api/v1/books/1/reviews?page=1&page_size=5
+
+###
+
+# ====== 认证 ======
+
+### 用户注册
+POST http://127.0.0.1:8000/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "123456",
+  "nickname": "测试用户"
+}
+
+###
+
+### 重复注册（应返回 409）
+POST http://127.0.0.1:8000/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "123456"
+}
+
+###
+
+### 用户登录
+POST http://127.0.0.1:8000/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "123456"
+}
+
+###
+
+### 登录失败（密码错误，应返回 401）
+POST http://127.0.0.1:8000/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "wrongpassword"
+}
+
+###
+
+### 刷新 Token（用登录返回的 refresh_token 替换）
+POST http://127.0.0.1:8000/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "替换为实际的 refresh_token"
+}
+
+###
+
+### 当前用户信息（用登录返回的 access_token 替换）
+GET http://127.0.0.1:8000/api/v1/auth/me
+Authorization: Bearer 替换为实际的 access_token
+
+###
+
+### 未登录访问 /me（应返回 401）
+GET http://127.0.0.1:8000/api/v1/auth/me
+
+###
+
+# ====== 写书评（需登录） ======
+
+### 发表书评（用实际的 access_token 替换）
+POST http://127.0.0.1:8000/api/v1/books/1/reviews
+Content-Type: application/json
+Authorization: Bearer 替换为实际的 access_token
+
+{
+  "rating": 5,
+  "content": "非常棒的入门书！"
+}
+
+###
+
+### 重复评同一本书（应返回 409）
+POST http://127.0.0.1:8000/api/v1/books/1/reviews
+Content-Type: application/json
+Authorization: Bearer 替换为实际的 access_token
+
+{
+  "rating": 4,
+  "content": "第二次评价"
+}
+
+###
+
+### 未登录写书评（应返回 401）
+POST http://127.0.0.1:8000/api/v1/books/1/reviews
+Content-Type: application/json
+
+{
+  "rating": 3,
+  "content": "没登录就想评价？"
+}
+
+###
+
+# ====== 校验测试 ======
+
+### 注册时用户名太短（应返回 422）
+POST http://127.0.0.1:8000/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "username": "ab",
+  "email": "bad@example.com",
+  "password": "123456"
+}
+
+###
+
+### 注册时密码太短（应返回 422）
+POST http://127.0.0.1:8000/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "username": "validuser",
+  "email": "valid@example.com",
+  "password": "12"
+}
