@@ -10,7 +10,6 @@ DELETE /api/v1/books/{id}      删除书籍，204 No Content
 """
 
 import json
-from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -19,6 +18,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.db import get_database
+from middleware.auth import get_current_user
 from config.redis import get_redis
 from crud.book import (
     get_books,
@@ -68,7 +68,7 @@ async def read_books(
         return JSONResponse(content=json.loads(cached), headers={"X-Cache": "HIT"})
 
     # 查数据库
-    books, total = await get_books(db, keyword, category_id, min_price, max_price, sort, page, page_size)
+    books, total = await get_books(db, keyword=keyword, category_id=category_id, min_price=min_price, max_price=max_price, sort=sort, page=page, page_size=page_size)
 
     items = []
     for b in books:
@@ -125,7 +125,7 @@ async def get_book(book_id: int, db: AsyncSession = Depends(get_database)):
 
 @router.post("/", status_code=201)
 async def create_new_book(
-    book_data: BookCreate, db: AsyncSession = Depends(get_database)
+    book_data: BookCreate, db: AsyncSession = Depends(get_database), current_user = Depends(get_current_user)
 ):
     """新增书籍 — 淘汰列表缓存"""
     book = await create_book(db, book_data)
@@ -169,7 +169,7 @@ async def update_existing_book(
 
 @router.delete("/{book_id}", status_code=204)
 async def delete_existing_book(
-    book_id: int, db: AsyncSession = Depends(get_database)
+    book_id: int, db: AsyncSession = Depends(get_database), current_user = Depends(get_current_user)
 ):
     """
     删除书籍 — 返回 204 No Content

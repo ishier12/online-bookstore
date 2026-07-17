@@ -38,8 +38,9 @@ class Book(Base):
         Index("idx_price", "price"),                       # 价格范围筛选
         Index("idx_created_at", "created_at"),             # 默认排序
         Index("idx_book_price", "book_name", "price"),     # 复合索引：书名= + 价格范围（最左前缀演示）
-        # MySQL 全文索引（搜索演进：LIKE → FULLTEXT → Elasticsearch）
-        Index("ft_book", "book_name", "author", "description", mysql_prefix="FULLTEXT"),
+        # MySQL 全文索引 — ngram 分词器支持中文（搜索演进：LIKE → FULLTEXT → Elasticsearch）
+        Index("ft_book", "book_name", "author", "description",
+              mysql_prefix="FULLTEXT", mysql_with_parser="ngram"),
         {"comment": "书籍表（商品）"},
     )
 
@@ -79,7 +80,7 @@ class Book(Base):
     # ====== ORM 关系 ======
     # 1:N ← Publisher
     publisher: Mapped[Optional["Publisher"]] = relationship(
-        "Publisher", back_populates="books", lazy="joined"
+        "Publisher", back_populates="books", lazy="selectin"
     )
     # M:N ← Category（通过 book_category 中间表）
     categories: Mapped[List["Category"]] = relationship(

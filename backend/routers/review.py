@@ -15,7 +15,9 @@ from crud.review import (
     get_user_review_for_book,
 )
 from schemas.review import ReviewCreate, ReviewResponse
-from utils.response import success_response, created_response, paginated_response
+from utils.response import created_response, paginated_response
+from utils.cache import delete_cache, build_cache_key
+from config.redis import get_redis
 from middleware.auth import get_current_user, get_optional_user
 from models.user import User
 
@@ -78,4 +80,7 @@ async def create_new_review(
     result = ReviewResponse.model_validate(review).model_dump()
     result["username"] = current_user.username
 
+    # 淘汰书详情缓存（均分和评论数已变化）
+    redis = get_redis()
+    await delete_cache(redis, build_cache_key("book", book_id))
     return created_response(result, message="书评发表成功")

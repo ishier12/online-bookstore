@@ -10,12 +10,15 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from models.book import Book, book_category
 from models.category import Category
+from models.publisher import Publisher
 
 
 async def get_books(
     db: AsyncSession,
     keyword: Optional[str] = None,
     category_id: Optional[int] = None,
+    publisher_id: Optional[int] = None,
+
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     sort: str = "created_at_desc",
@@ -40,15 +43,15 @@ async def get_books(
     """
     conditions = []
 
-    # 关键字搜索：FULLTEXT 优先（阶段二），空关键字时用 LIKE（阶段一兜底）
+    # 关键字搜索（阶段一：LIKE 模糊匹配）
+    # 演进路线：LIKE → FULLTEXT → Elasticsearch
+    # 当前使用 LIKE，体验全表扫描；后续切换 FULLTEXT 时只需替换此段代码，API 不变
     if keyword and keyword.strip():
-        # 阶段二：MySQL FULLTEXT 自然语言搜索
-        # JOIN 条件中需要考虑，所以放在后续作为一个额外过滤
+        kw = f"%{keyword.strip()}%"
         conditions.append(
-            text(
-                "MATCH(book.book_name, book.author, book.description) "
-                "AGAINST (:kw IN NATURAL LANGUAGE MODE)"
-            ).bindparams(kw=keyword.strip())
+            (Book.book_name.like(kw)) |
+            (Book.author.like(kw)) |
+            (Book.description.like(kw))
         )
 
     # 分类筛选（通过 M:N 中间表）
@@ -60,6 +63,9 @@ async def get_books(
                 )
             )
         )
+    # 出版社筛选
+    if publisher_id is not None:
+        conditions.append(Book.publisher_id == publisher_id)
 
     # 价格范围
     if min_price is not None:
@@ -76,11 +82,11 @@ async def get_books(
     }
     order_by = sort_map.get(sort, Book.created_at.desc())
 
-    # 基础查询（预加载出版社）
+    # 基础查询（预加载出版社，避免列表页 N+1）
     base_query = select(Book).options(joinedload(Book.publisher))
 
     # 总数查询
-    count_query = select(func.count(Book.id))
+    count_query = select(func.count()).select_from(Book)
     if conditions:
         count_query = count_query.where(*conditions)
     total = (await db.execute(count_query)).scalar()
