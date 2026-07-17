@@ -64,6 +64,15 @@ models/user_favorite.py — UserFavorite（收藏）
 - 真实书店场景：书籍覆盖文学小说、人文社科、经济管理、科学技术、生活休闲、艺术设计六大类
 - 50 本精选（真实书名）+ 250 本随机生成 = 300 本总计
 
+## 语义化版本
+
+- `v0.x` — 开发阶段，API 不稳定，功能持续迭代
+- `v1.0.0` — 第一个稳定版（API 承诺不变，向后兼容）
+- `v1.x.0` — 新增功能，不影响旧客户端（如 LIKE→FULLTEXT，API 契约不变）
+- `v2.0.0` — 不兼容的 API 变更（如改字段名、删端点、改响应格式）
+- 用 `git tag` 打版本：`git tag v0.1.0 && git push --tags`
+- 前端 `package.json` 的 `version` 字段与版本控制无关，那是给 npm 发包用的
+
 ## Git 提交规范
 
 - 使用约定式提交：`feat:` / `fix:` / `docs:` / `refactor:` / `chore:`

@@ -9,7 +9,16 @@ from datetime import datetime
 from decimal import Decimal
 
 from schemas.publisher import PublisherResponse
-from schemas.category import CategoryResponse
+
+
+# 分类标签（flat，无 children） — 用于书籍详情页的分类展示
+# 注意：不用 CategoryResponse 是因为它包含 children 字段会触发 ORM 懒加载
+class CategoryTag(BaseModel):
+    id: int
+    name: str
+    parent_id: Optional[int] = None
+
+    model_config = {"from_attributes": True}
 
 
 # ====== 请求 ======
@@ -73,7 +82,7 @@ class BookDetailResponse(BaseModel):
     description: Optional[str] = None
     stock: int
     publisher: Optional[PublisherResponse] = None
-    categories: list[CategoryResponse] = []
+    categories: list[CategoryTag] = []  # CategoryTag 无 children，避免懒加载
     avg_rating: Optional[float] = None
     review_count: int = 0
     created_at: datetime

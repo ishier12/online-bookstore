@@ -42,6 +42,7 @@ async def list_publisher_books(
     )
     items = []
     for b in books:
+        # publisher 已通过 joinedload 预加载
         item = BookResponse.model_validate(b).model_dump()
         item["publisher_name"] = b.publisher.name if b.publisher else None
         items.append(item)

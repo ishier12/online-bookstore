@@ -1,12 +1,8 @@
 """
 书籍路由模块
 RESTful API — 所有端点前缀 /api/v1/books
-
-GET    /api/v1/books           书籍列表（搜索/筛选/排序/分页，缓存 300s）
-GET    /api/v1/books/{id}      书籍详情（含出版社/分类/均分/评论数，缓存 300s）
-POST   /api/v1/books           新增书籍，201 Created
-PATCH  /api/v1/books/{id}      部分更新（PATCH 语义）
-DELETE /api/v1/books/{id}      删除书籍，204 No Content
+CRUD 层负责 eager loading（joinedload/selectinload/refresh），确保 ORM 属性已加载
+Router 层用 model_validate 安全转换 ORM→Pydantic
 """
 
 import json
@@ -21,25 +17,17 @@ from config.db import get_database
 from middleware.auth import get_current_user
 from config.redis import get_redis
 from crud.book import (
-    get_books,
-    get_book_by_id,
-    get_book_with_relations,
-    create_book,
-    update_book,
-    delete_book,
+    get_books, get_book_with_relations, create_book, update_book, delete_book,
 )
 from crud.review import get_book_avg_rating
-from schemas.book import (
-    BookCreate, BookUpdate, BookResponse, BookDetailResponse
-)
+from schemas.book import BookCreate, BookUpdate, BookResponse, BookDetailResponse
 from schemas.publisher import PublisherResponse
-from schemas.category import CategoryResponse
 from utils.cache import get_cache, set_cache, delete_cache, build_cache_key
 from utils.response import success_response, created_response, paginated_response
 
 router = APIRouter(prefix="/api/v1/books", tags=["书籍"])
 
-CACHE_TTL = 300  # 缓存过期时间（秒）
+CACHE_TTL = 300
 
 
 @router.get("/")
@@ -49,36 +37,28 @@ async def read_books(
     category_id: Optional[int] = Query(None, description="分类ID筛选"),
     min_price: Optional[float] = Query(None, ge=0, description="最低价格"),
     max_price: Optional[float] = Query(None, ge=0, description="最高价格"),
-    sort: str = Query("created_at_desc", description="排序: created_at_desc/price_asc/price_desc/title_asc"),
+    sort: str = Query("created_at_desc", description="排序"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(12, ge=1, le=50, description="每页条数"),
 ):
-    """
-    书籍列表 — 支持多条件搜索、分类筛选、价格范围、排序、分页
-    结果被 Redis 缓存（TTL=300s），新增/修改/删除时自动淘汰
-    """
+    """书籍列表 — 搜索结果缓存 300s"""
     redis = get_redis()
     cache_key = build_cache_key(
         "books:list", keyword, category_id, min_price, max_price, sort, page, page_size
     )
 
-    # 查缓存
     cached = await get_cache(redis, cache_key)
     if cached:
         return JSONResponse(content=json.loads(cached), headers={"X-Cache": "HIT"})
 
-    # 查数据库
-    books, total = await get_books(db, keyword=keyword, category_id=category_id, min_price=min_price, max_price=max_price, sort=sort, page=page, page_size=page_size)
-
-    items = []
-    for b in books:
-        item = BookResponse.model_validate(b).model_dump()
-        # 预填充出版社名（joinedload 已加载，避免 N+1）
-        item["publisher_name"] = b.publisher.name if b.publisher else None
-        items.append(item)
+    items, total = await get_books(
+        db, keyword=keyword, category_id=category_id,
+        min_price=min_price, max_price=max_price,
+        sort=sort, page=page, page_size=page_size,
+    )
 
     result = paginated_response(items, total, page, page_size)
-    # jsonable_encoder 处理 Decimal 等 Python 标准 json 不支持的类型的序列化
+    # jsonable_encoder 处理 Decimal → json 兼容类型（Python 标准 json.dumps 不认识 Decimal）
     serializable = jsonable_encoder(result)
     await set_cache(redis, cache_key, json.dumps(serializable), ttl=CACHE_TTL)
     return JSONResponse(content=serializable, headers={"X-Cache": "MISS"})
@@ -86,56 +66,29 @@ async def read_books(
 
 @router.get("/{book_id}")
 async def get_book(book_id: int, db: AsyncSession = Depends(get_database)):
-    """
-    书籍详情 — 含出版社信息、分类列表、平均评分、评论数
-    结果被 Redis 缓存
-    """
+    """书籍详情 — 含出版社、分类、均分、评论数，缓存 300s"""
     redis = get_redis()
     cache_key = build_cache_key("book", book_id)
 
-    # 查缓存
     cached = await get_cache(redis, cache_key)
     if cached:
         return JSONResponse(content=json.loads(cached), headers={"X-Cache": "HIT"})
 
-    # 查数据库（预加载关联）
+    # publisher + categories 已通过 joinedload/selectinload 预加载
+    # categories 使用 CategoryTag（无 children），model_validate 不触发懒加载
     book = await get_book_with_relations(db, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="书籍不存在")
 
-    # 均分和评论数
     avg_rating, review_count = await get_book_avg_rating(db, book_id)
 
-    # 手动构建响应 dict，避免 Pydantic model_validate 触发 ORM 懒加载
-    result = {
-        "id": book.id,
-        "book_name": book.book_name,
-        "author": book.author,
-        "price": book.price,
-        "isbn": book.isbn,
-        "cover_url": book.cover_url,
-        "description": book.description,
-        "stock": book.stock,
-        "created_at": book.created_at,
-        "updated_at": book.updated_at,
-        "publisher": {
-            "id": book.publisher.id,
-            "name": book.publisher.name,
-            "description": book.publisher.description,
-            "created_at": book.publisher.created_at,
-        } if book.publisher else None,
-        "categories": [
-            {
-                "id": c.id,
-                "name": c.name,
-                "parent_id": c.parent_id,
-                "children": [],  # 书籍详情不展示子分类树
-            }
-            for c in book.categories
-        ],
-        "avg_rating": avg_rating,
-        "review_count": review_count,
-    }
+    result = BookDetailResponse.model_validate(book).model_dump()
+    result["publisher"] = (
+        PublisherResponse.model_validate(book.publisher).model_dump()
+        if book.publisher else None
+    )
+    result["avg_rating"] = avg_rating
+    result["review_count"] = review_count
 
     response_data = success_response(result)
     serializable = jsonable_encoder(response_data)
@@ -145,12 +98,13 @@ async def get_book(book_id: int, db: AsyncSession = Depends(get_database)):
 
 @router.post("/", status_code=201)
 async def create_new_book(
-    book_data: BookCreate, db: AsyncSession = Depends(get_database), current_user = Depends(get_current_user)
+    book_data: BookCreate,
+    db: AsyncSession = Depends(get_database),
+    current_user = Depends(get_current_user),
 ):
     """新增书籍 — 淘汰列表缓存"""
     book = await create_book(db, book_data)
 
-    # 淘汰缓存
     redis = get_redis()
     await delete_cache(redis, "books:list*")
 
@@ -164,6 +118,7 @@ async def update_existing_book(
     book_id: int,
     book_data: BookUpdate,
     db: AsyncSession = Depends(get_database),
+    current_user = Depends(get_current_user),
 ):
     """
     部分更新书籍（PATCH — 只更新传了的字段）
@@ -177,7 +132,6 @@ async def update_existing_book(
     if book is None:
         raise HTTPException(status_code=404, detail="书籍不存在")
 
-    # 淘汰该书和列表的缓存
     redis = get_redis()
     await delete_cache(redis, build_cache_key("book", book_id))
     await delete_cache(redis, "books:list*")
@@ -189,7 +143,9 @@ async def update_existing_book(
 
 @router.delete("/{book_id}", status_code=204)
 async def delete_existing_book(
-    book_id: int, db: AsyncSession = Depends(get_database), current_user = Depends(get_current_user)
+    book_id: int,
+    db: AsyncSession = Depends(get_database),
+    current_user = Depends(get_current_user),
 ):
     """
     删除书籍 — 返回 204 No Content
@@ -202,10 +158,8 @@ async def delete_existing_book(
     if book is None:
         raise HTTPException(status_code=404, detail="书籍不存在")
 
-    # 淘汰缓存
     redis = get_redis()
     await delete_cache(redis, build_cache_key("book", book_id))
     await delete_cache(redis, "books:list*")
 
-    # 204 No Content — 不返回任何 body
     return Response(status_code=204)
