@@ -1,10 +1,15 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+
+// 不需要顶部搜索栏的页面
+const HIDE_SEARCH_ON = ['/login', '/register', '/profile'];
 
 export default function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const showSearch = !HIDE_SEARCH_ON.includes(location.pathname);
   const [keyword, setKeyword] = useState('');
 
   const handleSearch = (e: React.FormEvent) => {
@@ -22,16 +27,18 @@ export default function Navbar() {
           📚 在线书店
         </Link>
 
-        {/* 搜索栏 */}
-        <form onSubmit={handleSearch} className="flex-1 max-w-md mx-6">
-          <input
-            type="text"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder="搜索书名、作者..."
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
-        </form>
+        {/* 搜索栏 — 登录/注册/个人中心页不显示 */}
+        {showSearch && (
+          <form onSubmit={handleSearch} className="flex-1 max-w-md mx-6">
+            <input
+              type="text"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="搜索书名、作者..."
+              className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            />
+          </form>
+        )}
 
         {/* 右侧 */}
         <div className="flex items-center gap-4 text-sm">

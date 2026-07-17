@@ -54,12 +54,18 @@ async def get_books(
             (Book.description.like(kw))
         )
 
-    # 分类筛选（通过 M:N 中间表）
+    # 分类筛选（支持父分类自动包含子分类）
     if category_id is not None:
+        # 查询该分类的子分类 ID
+        children_ids = (await db.execute(
+            select(Category.id).where(Category.parent_id == category_id)
+        )).scalars().all()
+        # 筛选条件：该分类或任意子分类
+        filter_ids = [category_id] + list(children_ids) if children_ids else [category_id]
         conditions.append(
             Book.id.in_(
                 select(book_category.c.book_id).where(
-                    book_category.c.category_id == category_id
+                    book_category.c.category_id.in_(filter_ids)
                 )
             )
         )

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { getBooks } from '../api/books';
-import type { Book } from '../types';
+import { getCategories } from '../api/categories';
+import type { Book, Category } from '../types';
 import BookGrid from '../components/books/BookGrid';
 import BookSearch from '../components/books/BookSearch';
 import Pagination from '../components/common/Pagination';
@@ -29,6 +30,24 @@ export default function BookListPage() {
   const [maxPrice, setMaxPrice] = useState(searchParams.get('max_price') || '');
   const [sort, setSort] = useState(searchParams.get('sort') || 'created_at_desc');
   const [page, setPage] = useState(Number(searchParams.get('page')) || 1);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  // 找到当前筛选的分类名（用于顶部提示）
+  const currentCategoryName = (() => {
+    if (!categoryId) return null;
+    for (const cat of categories) {
+      if (cat.id === categoryId) return cat.name;
+      for (const child of cat.children || []) {
+        if (child.id === categoryId) return `${cat.name} / ${child.name}`;
+      }
+    }
+    return null;
+  })();
+
+  // 加载分类列表（用于显示当前分类名）
+  useEffect(() => {
+    getCategories().then(setCategories).catch(() => {});
+  }, []);
 
   const fetchBooks = useCallback(async () => {
     setLoading(true);
@@ -79,6 +98,26 @@ export default function BookListPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-4">书籍列表</h1>
+
+      {/* 当前筛选提示 */}
+      {(currentCategoryName || publisherId) && (
+        <div className="flex items-center gap-2 mb-4 text-sm">
+          <span className="text-gray-500">当前筛选：</span>
+          {currentCategoryName && (
+            <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
+              📂 {currentCategoryName}
+            </span>
+          )}
+          {publisherId && (
+            <span className="bg-purple-50 text-purple-600 px-3 py-1 rounded-full">
+              🏢 出版社 ID: {publisherId}
+            </span>
+          )}
+          <Link to="/books" className="text-gray-400 hover:text-red-500 ml-2">
+            清除筛选 ✕
+          </Link>
+        </div>
+      )}
 
       <BookSearch
         keyword={keyword}

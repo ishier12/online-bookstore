@@ -60,6 +60,7 @@ export default function BookSearch({
             <option value="">全部分类</option>
             {categories.map((cat) => (
               <optgroup key={cat.id} label={cat.name}>
+                <option value={cat.id}>全部{cat.name}</option>
                 {cat.children?.map((child) => (
                   <option key={child.id} value={child.id}>
                     {child.name}
