@@ -18,7 +18,7 @@ from schemas.review import ReviewCreate, ReviewResponse
 from utils.response import created_response, paginated_response
 from utils.cache import delete_cache, build_cache_key
 from config.redis import get_redis
-from middleware.auth import get_current_user, get_optional_user
+from middleware.auth import get_current_user
 from models.user import User
 
 router = APIRouter(prefix="/api/v1/books", tags=["书评"])

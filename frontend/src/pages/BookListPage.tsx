@@ -22,6 +22,9 @@ export default function BookListPage() {
   const [categoryId, setCategoryId] = useState<number | undefined>(
     searchParams.get('category_id') ? Number(searchParams.get('category_id')) : undefined
   );
+  const [publisherId, setPublisherId] = useState<number | undefined>(
+    searchParams.get('publisher_id') ? Number(searchParams.get('publisher_id')) : undefined
+  );
   const [minPrice, setMinPrice] = useState(searchParams.get('min_price') || '');
   const [maxPrice, setMaxPrice] = useState(searchParams.get('max_price') || '');
   const [sort, setSort] = useState(searchParams.get('sort') || 'created_at_desc');
@@ -38,6 +41,7 @@ export default function BookListPage() {
       };
       if (keyword.trim()) params.keyword = keyword.trim();
       if (categoryId) params.category_id = categoryId;
+      if (publisherId) params.publisher_id = publisherId;
       if (minPrice) params.min_price = Number(minPrice);
       if (maxPrice) params.max_price = Number(maxPrice);
 
@@ -49,6 +53,7 @@ export default function BookListPage() {
       const sp = new URLSearchParams();
       if (keyword.trim()) sp.set('keyword', keyword.trim());
       if (categoryId) sp.set('category_id', String(categoryId));
+      if (publisherId) sp.set('publisher_id', String(publisherId));
       if (minPrice) sp.set('min_price', minPrice);
       if (maxPrice) sp.set('max_price', maxPrice);
       if (sort !== 'created_at_desc') sp.set('sort', sort);
@@ -59,11 +64,12 @@ export default function BookListPage() {
     } finally {
       setLoading(false);
     }
-  }, [keyword, categoryId, minPrice, maxPrice, sort, page]);
+  }, [keyword, categoryId, publisherId, minPrice, maxPrice, sort, page]);
 
+  // URL 参数变化时自动查询（支持浏览器前进后退 + 从详情页跳转带参数）
   useEffect(() => {
     fetchBooks();
-  }, [page]); // 页码变化时重新请求
+  }, [page]);
 
   const handleSearch = () => {
     setPage(1);

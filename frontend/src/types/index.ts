@@ -74,6 +74,7 @@ export interface BookDetail {
 export interface BookSearchParams {
   keyword?: string;
   category_id?: number;
+  publisher_id?: number;
   min_price?: number;
   max_price?: number;
   sort?: string;

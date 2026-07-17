@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { getBook } from '../api/books';
 import { getReviews, createReview } from '../api/reviews';
 import { useAuth } from '../context/AuthContext';
@@ -88,7 +88,10 @@ export default function BookDetailPage() {
 
             {book.publisher && (
               <p className="text-sm text-gray-600 mb-2">
-                出版社：{book.publisher.name}
+                出版社：
+                <Link to={`/books?publisher_id=${book.publisher.id}`} className="text-indigo-600 hover:underline">
+                  {book.publisher.name}
+                </Link>
               </p>
             )}
 
@@ -98,12 +101,13 @@ export default function BookDetailPage() {
 
             <div className="flex items-center gap-2 mb-3">
               {book.categories.map((cat) => (
-                <span
+                <Link
                   key={cat.id}
-                  className="bg-indigo-50 text-indigo-600 text-xs px-2 py-0.5 rounded-full"
+                  to={`/books?category_id=${cat.id}`}
+                  className="bg-indigo-50 text-indigo-600 text-xs px-2 py-0.5 rounded-full hover:bg-indigo-100 transition-colors"
                 >
                   {cat.name}
-                </span>
+                </Link>
               ))}
             </div>
 
