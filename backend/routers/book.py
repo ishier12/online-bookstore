@@ -106,16 +106,36 @@ async def get_book(book_id: int, db: AsyncSession = Depends(get_database)):
     # 均分和评论数
     avg_rating, review_count = await get_book_avg_rating(db, book_id)
 
-    result = BookDetailResponse.model_validate(book).model_dump()
-    result["publisher"] = (
-        PublisherResponse.model_validate(book.publisher).model_dump()
-        if book.publisher else None
-    )
-    result["categories"] = [
-        CategoryResponse.model_validate(c).model_dump() for c in book.categories
-    ]
-    result["avg_rating"] = avg_rating
-    result["review_count"] = review_count
+    # 手动构建响应 dict，避免 Pydantic model_validate 触发 ORM 懒加载
+    result = {
+        "id": book.id,
+        "book_name": book.book_name,
+        "author": book.author,
+        "price": book.price,
+        "isbn": book.isbn,
+        "cover_url": book.cover_url,
+        "description": book.description,
+        "stock": book.stock,
+        "created_at": book.created_at,
+        "updated_at": book.updated_at,
+        "publisher": {
+            "id": book.publisher.id,
+            "name": book.publisher.name,
+            "description": book.publisher.description,
+            "created_at": book.publisher.created_at,
+        } if book.publisher else None,
+        "categories": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "parent_id": c.parent_id,
+                "children": [],  # 书籍详情不展示子分类树
+            }
+            for c in book.categories
+        ],
+        "avg_rating": avg_rating,
+        "review_count": review_count,
+    }
 
     response_data = success_response(result)
     serializable = jsonable_encoder(response_data)
