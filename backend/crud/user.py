@@ -46,4 +46,5 @@ async def create_user(db: AsyncSession, data: UserRegister, hashed_password: str
     )
     db.add(user)
     await db.flush()
+    await db.refresh(user)  # 加载 server_default 字段 (created_at)，避免 Pydantic 序列化时懒加载
     return user
